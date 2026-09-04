@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yoink Direct Downloader</title>
+    <title>YoinkBot Downloader</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #f4f4f5;
+            background-color: #0f172a;
+            color: #f8fafc;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -18,26 +19,29 @@
             padding: 20px;
         }
         .card {
-            background: #ffffff;
+            background: #1e293b;
             padding: 24px;
             border-radius: 16px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
             width: 100%;
             max-width: 380px;
             text-align: center;
         }
-        h2 { margin-bottom: 8px; color: #18181b; font-size: 20px; }
-        p { margin-bottom: 20px; color: #71717a; font-size: 13px; line-height: 1.4; }
+        h2 { margin-bottom: 8px; font-size: 20px; color: #38bdf8; }
+        p { margin-bottom: 20px; color: #94a3b8; font-size: 13px; line-height: 1.4; }
         
         .input-box {
             width: 100%;
-            padding: 12px;
-            border: 1px solid #e4e4e7;
+            padding: 14px;
+            border: 1px solid #334155;
+            background: #0f172a;
+            color: #fff;
             border-radius: 10px;
-            font-size: 14px;
+            font-size: 15px;
             outline: none;
             margin-bottom: 16px;
         }
+        .input-box:focus { border-color: #38bdf8; }
 
         .btn-download {
             width: 100%;
@@ -47,45 +51,23 @@
             font-size: 16px;
             font-weight: bold;
             color: white;
-            background-color: #2563eb;
+            background: linear-gradient(135deg, #0284c7, #2563eb);
             cursor: pointer;
-            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
         }
-        .btn-download:active { opacity: 0.85; }
-
-        .btn-browse {
-            width: 100%;
-            padding: 12px;
-            border: none;
-            border-radius: 10px;
-            font-size: 14px;
-            color: #71717a;
-            background-color: #f4f4f5;
-            cursor: pointer;
-            margin-top: 12px;
-        }
+        .btn-download:active { opacity: 0.85; transform: scale(0.98); }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <h2>🚀 高速免廣告下載</h2>
-        <p>貼上想要下載的影片網址，點擊下方按鈕將自動複製網址並開啟直連下載頁面：</p>
+        <h2>🚀 YoinkBot 無廣告下載</h2>
+        <p>貼上 YouTube 或 IG 影片網址，Bot 將直接把影片傳送到聊天室！</p>
 
-        <input type="text" id="videoUrl" class="input-box" placeholder="在此貼上影片網址..." />
+        <input type="text" id="videoUrl" class="input-box" placeholder="在此長按貼上網址..." />
 
-        <button class="btn-download" onclick="startDirectDownload()">
-            ⚡ 一鍵複製網址並開啟下載頁面
-        </button>
-
-        <hr style="margin: 20px 0; border: none; border-top: 1px solid #f4f4f5;" />
-
-        <button class="btn-browse" onclick="openYouTube()">
-            🌐 開啟 YouTube 尋找影片
+        <button class="btn-download" onclick="sendToBot()">
+            📥 立即傳送給 Bot 下載
         </button>
     </div>
 
@@ -93,28 +75,17 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        const TARGET_DOWNLOADER = "https://ssyou.online/en1401Yd/";
-
-        function startDirectDownload() {
-            const rawUrl = document.getElementById('videoUrl').value.trim();
+        function sendToBot() {
+            const url = document.getElementById('videoUrl').value.trim();
             
-            if (!rawUrl) {
-                alert('請先貼上影片網址！');
+            if (!url) {
+                alert('請先貼上網址！');
                 return;
             }
 
-            // 1. 自動複製網址到剪貼簿
-            navigator.clipboard.writeText(rawUrl).then(() => {
-                // 2. 複製成功後開啟專用下載管道
-                tg.openLink(TARGET_DOWNLOADER);
-            }).catch(() => {
-                // 若瀏覽器權限受限，依然正常開啟管道
-                tg.openLink(TARGET_DOWNLOADER);
-            });
-        }
-
-        function openYouTube() {
-            tg.openLink('https://m.youtube.com');
+            // 直接將網址傳回 Bot 後端處理
+            tg.sendData(url);
+            tg.close();
         }
     </script>
 </body>
