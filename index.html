@@ -8,7 +8,7 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
             background-color: #f4f4f5;
             display: flex;
             flex-direction: column;
@@ -53,19 +53,18 @@
             font-weight: bold;
             cursor: pointer;
         }
-        button:active { opacity: 0.9; }
-        .btn-yt { background-color: #ff0000; margin-bottom: 8px; }
+        .btn-yt { background-color: #ff0000; margin-top: 8px; }
     </style>
 </head>
 <body>
 
     <div class="card">
         <h2>🚀 YoinkBot 影片下載助理</h2>
-        <p>貼上想要下載的影片網址，點擊下方按鈕將網址傳回 Bot 自動發送影片！</p>
+        <p>貼上想要下載的影片網址，點擊下方按鈕將自動帶入聊天室下載！</p>
 
         <div class="input-group">
             <input type="text" id="videoUrl" placeholder="貼上 YouTube / IG 網址..." />
-            <button onclick="sendUrlToBot()">📥 傳送給 Bot 下載</button>
+            <button onclick="sendUrlToBot()">📩 傳送給 Bot 下載</button>
         </div>
 
         <hr style="margin: 16px 0; border: none; border-top: 1px solid #f4f4f5;" />
@@ -83,9 +82,15 @@
                 alert('請先貼上網址！');
                 return;
             }
-            // 點擊後直接把網址傳回 Telegram Bot 後台處理
-            tg.sendData(url);
-            tg.close();
+            // 使用 switchInlineQuery 切換回聊天室並自動帶入網址
+            if (tg.switchInlineQuery) {
+                tg.switchInlineQuery(url);
+            } else {
+                // 備用方案：複製到剪貼簿
+                navigator.clipboard.writeText(url);
+                alert('網址已複製！請直接貼上至聊天室傳送。');
+                tg.close();
+            }
         }
 
         function openExternal(url) {
@@ -94,4 +99,3 @@
     </script>
 </body>
 </html>
-
