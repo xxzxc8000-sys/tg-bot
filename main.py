@@ -14,22 +14,18 @@ from telegram.ext import (
     filters,
 )
 
-# 設定 Log 紀錄格式
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
 
-# 從環境變數讀取 Bot Token
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TMP_DIR = Path("tmp_downloads")
 TMP_DIR.mkdir(exist_ok=True)
 
-# Telegram Bot API 單檔傳送上限（50MB）
 MAX_FILE_SIZE = 50 * 1024 * 1024
 
-# 建立假 Web 伺服器通過 Render Health Check
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -63,6 +59,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'max_filesize': MAX_FILE_SIZE,
             'quiet': True,
             'no_warnings': True,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['mweb', 'android', 'ios'],
+                }
+            },
         }
 
         def run_ytdlp():
@@ -99,7 +100,6 @@ def main():
     if not TOKEN:
         raise RuntimeError("環境變數 TELEGRAM_BOT_TOKEN 未設定")
 
-    # 在背景啟動假 Port 監聽（防止 Render 強制關閉）
     threading.Thread(target=run_dummy_server, daemon=True).start()
 
     app = Application.builder().token(TOKEN).build()
