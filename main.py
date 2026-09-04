@@ -1,7 +1,9 @@
 import os
 import logging
 import asyncio
+import threading
 from pathlib import Path
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import yt_dlp
 from telegram import Update
 from telegram.ext import (
@@ -27,6 +29,18 @@ TMP_DIR.mkdir(exist_ok=True)
 # Telegram Bot API 單檔傳送上限（50MB）
 MAX_FILE_SIZE = 50 * 1024 * 1024
 
+# 建立假 Web 伺服器通過 Render Health Check
+class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is live!")
+
+def run_dummy_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), SimpleHTTPRequestHandler)
+    server.serve_forever()
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 歡迎使用影片下載 Bot！\n請直接傳送影片網址（如 YouTube / IG 等），我會幫你下載並回傳給你。"
@@ -42,7 +56,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     local_path: Path | None = None
 
     try:
-        # 設定檔案下載樣板與 yt-dlp 參數
         output_template = str(TMP_DIR / f"{update.message.message_id}_%(title)s.%(ext)s")
         ydl_opts = {
             'outtmpl': output_template,
@@ -52,14 +65,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'no_warnings': True,
         }
 
-        # 執行同步下載邏輯
         def run_ytdlp():
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(text, download=True)
                 filename = ydl.prepare_filename(info)
                 return Path(filename)
 
-        # 避免阻塞 Telegram 輪詢，將同步下載丟至背景執行
         loop = asyncio.get_running_loop()
         local_path = await loop.run_in_executor(None, run_ytdlp)
 
@@ -69,7 +80,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await status_msg.edit_text("📤 下載完成，正在傳送影片給您...")
 
-        # 傳送影片回 Telegram 聊天室
         with open(local_path, "rb") as f:
             await update.message.reply_video(video=f, filename=local_path.name)
 
@@ -79,7 +89,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.exception("處理影片時發生錯誤")
         await status_msg.edit_text(f"❌ 處理失敗（可能無效連結或檔案超過 50MB 上限）：{e}")
     finally:
-        # 下載完成或失敗後，自動清除伺服器暫存檔
         if local_path and local_path.exists():
             try:
                 local_path.unlink()
@@ -89,6 +98,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     if not TOKEN:
         raise RuntimeError("環境變數 TELEGRAM_BOT_TOKEN 未設定")
+
+    # 在背景啟動假 Port 監聽（防止 Render 強制關閉）
+    threading.Thread(target=run_dummy_server, daemon=True).start()
 
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
