@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Downloader Browser</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; display: flex; flex-direction: column; height: 100vh; background: #f0f0f0; }
+        
+        /* 頂部網址列 */
+        .top-bar { display: flex; align-items: center; padding: 8px 12px; background: #e0e0e0; gap: 8px; }
+        .home-btn { background: none; border: none; font-size: 18px; cursor: pointer; }
+        .url-input { flex: 1; padding: 6px 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; outline: none; }
+
+        /* 瀏覽器主視窗 */
+        .browser-frame { flex: 1; width: 100%; border: none; background: #fff; }
+
+        /* 底頁功能列與下載鈕 */
+        .bottom-bar { display: flex; flex-direction: column; align-items: center; padding: 10px; background: #fff; border-top: 1px solid #ddd; gap: 8px; }
+        .download-btn { width: 80%; padding: 12px; background: #ff0000; color: #fff; font-weight: bold; font-size: 16px; border: none; border-radius: 10px; cursor: pointer; text-align: center; }
+        .nav-icons { display: flex; justify-content: space-around; width: 100%; padding-top: 5px; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+
+    <!-- 頂部搜尋列 -->
+    <div class="top-bar">
+        <button class="home-btn" onclick="goHome()">🏠</button>
+        <input type="text" id="urlInput" class="url-input" value="https://m.youtube.com" placeholder="搜尋或輸入網址...">
+        <button class="home-btn" onclick="loadUrl()">🔄</button>
+    </div>
+
+    <!-- 內建 Web 檢視器 -->
+    <iframe id="webViewer" class="browser-frame" src="https://m.youtube.com"></iframe>
+
+    <!-- 底部下載列 -->
+    <div class="bottom-bar">
+        <button class="download-btn" onclick="triggerDownload()">加載制內存 (下載影片)</button>
+        <div class="nav-icons">
+            <span>🧭 瀏覽</span>
+            <span>⬇️ 下載</span>
+            <span>📋 播放列表</span>
+            <span>⚙️ 設定</span>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // 鋪滿 Telegram 畫面
+
+        function loadUrl() {
+            let url = document.getElementById('urlInput').value;
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://www.google.com/search?q=' + encodeURIComponent(url);
+            }
+            document.getElementById('webViewer').src = url;
+        }
+
+        function goHome() {
+            document.getElementById('urlInput').value = "https://m.youtube.com";
+            document.getElementById('webViewer').src = "https://m.youtube.com";
+        }
+
+        function triggerDownload() {
+            const currentUrl = document.getElementById('webViewer').src;
+            // 將網址傳回 Telegram Bot 後台進行下載處置
+            tg.sendData(JSON.stringify({ action: "download", url: currentUrl }));
+            tg.close();
+        }
+    </script>
+</body>
+</html>
