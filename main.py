@@ -5,15 +5,24 @@ import threading
 from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import yt_dlp
-from telegram import Update
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    WebAppInfo,
+    InlineQueryResultArticle,
+    InputTextMessageContent,
+)
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
+    InlineQueryHandler,
     ContextTypes,
     filters,
 )
 
+# 設定 Log 紀錄格式
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
@@ -24,8 +33,9 @@ TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TMP_DIR = Path("tmp_downloads")
 TMP_DIR.mkdir(exist_ok=True)
 
-MAX_FILE_SIZE = 50 * 1024 * 1024
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB 上限
 
+# 假 Web 伺服器通過 Render Health Check
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -37,15 +47,38 @@ def run_dummy_server():
     server = HTTPServer(("0.0.0.0", port), SimpleHTTPRequestHandler)
     server.serve_forever()
 
+# 建立備用下載管道按鈕（Mini App 與 Web 連結）
+def get_fallback_keyboard(url: str = ""):
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "🚀 開啟 YT1S 下載器 (Mini App)", 
+                web_app=WebAppInfo(url="https://wwv-yt1s.com")
+            )
+        ],
+        [
+            InlineKeyboardButton("🌐 SSYOU 線上下載", url="https://ssyou.online/"),
+            InlineKeyboardButton("⚡ YT1S 備用網頁", url="https://wwv-yt1s.com")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "👋 歡迎使用影片下載 Bot！\n請直接傳送影片網址（如 YouTube / IG 等），我會幫你下載並回傳給你。"
+        "👋 歡迎使用 YoinkBot！\n\n"
+        "1. 直接傳送影片網址，我會自動幫你下載。\n"
+        "2. 點擊下方按鈕可直接開啟內建下載介面。\n"
+        "3. 在任何聊天室輸入 `@OopsYoinkBot 網址` 即可快速呼叫！",
+        reply_markup=get_fallback_keyboard()
     )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (update.message.text or "").strip()
     if not text.startswith("http"):
-        await update.message.reply_text("請傳送有效的網址（需以 http:// 或 https:// 開頭）。")
+        await update.message.reply_text(
+            "請傳送有效的網址（以 http 或 https 開頭）。",
+            reply_markup=get_fallback_keyboard()
+        )
         return
 
     status_msg = await update.message.reply_text("⏳ 解析與下載中，請稍候...")
@@ -76,7 +109,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         local_path = await loop.run_in_executor(None, run_ytdlp)
 
         if not local_path.exists():
-            await status_msg.edit_text("❌ 解析失敗或找不到下載檔案。")
+            await status_msg.edit_text(
+                "❌ 解析失敗。請嘗試使用以下備用管道下載：",
+                reply_markup=get_fallback_keyboard(text)
+            )
             return
 
         await status_msg.edit_text("📤 下載完成，正在傳送影片給您...")
@@ -88,13 +124,33 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logger.exception("處理影片時發生錯誤")
-        await status_msg.edit_text(f"❌ 處理失敗（可能無效連結或檔案超過 50MB 上限）：{e}")
+        await status_msg.edit_text(
+            f"❌ 直接下載失敗（可能超過 50MB 上限或觸發限制）。\n您可以改用以下線上管道下載：",
+            reply_markup=get_fallback_keyboard(text)
+        )
     finally:
         if local_path and local_path.exists():
             try:
                 local_path.unlink()
             except OSError:
                 pass
+
+# Inline Mode 行內搜尋處理
+async def inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.inline_query.query.strip()
+    if not query:
+        return
+
+    results = [
+        InlineQueryResultArticle(
+            id="1",
+            title="🎬 解析並下載此影片",
+            description=f"網址: {query}",
+            input_message_content=InputTextMessageContent(query),
+            reply_markup=get_fallback_keyboard(query)
+        )
+    ]
+    await update.inline_query.answer(results, cache_time=1)
 
 def main():
     if not TOKEN:
@@ -103,9 +159,13 @@ def main():
     threading.Thread(target=run_dummy_server, daemon=True).start()
 
     app = Application.builder().token(TOKEN).build()
+    
+    # 註冊 Handler
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    logger.info("Bot 已啟動...")
+    app.add_handler(InlineQueryHandler(inline_query))
+
+    logger.info("YoinkBot 已啟動...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
